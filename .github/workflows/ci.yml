@@ -39,6 +39,15 @@ jobs:
           chmod +x build.sh
           ./build.sh
 
+      # Novo passo: cria a tag para o release funcionar
+      - name: Create Tag
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag -a "v${{ github.run_number }}" -m "Release v${{ github.run_number }}"
+          git push origin "v${{ github.run_number }}"
+
       - name: Create Release and Upload Asset
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v1
@@ -46,7 +55,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: projeto.zip
-
 
   docker-build-publish:
     runs-on: ubuntu-latest
@@ -65,11 +73,12 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build Docker image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/meu-app:latest .
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/meu-app:latest -t ${{ secrets.DOCKER_USERNAME }}/meu-app:v${{ github.run_number }} .
 
       - name: Run tests inside container
-        run: |
-          docker run --rm ${{ secrets.DOCKER_USERNAME }}/meu-app:latest pytest test_app.py
+        run: docker run --rm ${{ secrets.DOCKER_USERNAME }}/meu-app:v${{ github.run_number }} pytest test_app.py
 
       - name: Push to Docker Hub
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/meu-app:latest
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/meu-app:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/meu-app:v${{ github.run_number }}
